@@ -1,1 +1,2 @@
-Quick weekend project to create a personal MTA sign for my local station. Relies on MTAPI
+Panel for viewing MTA information, reading from Protobuffers
+
