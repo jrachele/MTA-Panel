@@ -13,11 +13,16 @@ constexpr int STATION_ID_LENGTH = 16;
 constexpr int MAX_TRAINS = 3;
 
 // TODO?: Embed station.txt data from MTA; not really relevant here since I'm not writing a whole API
+struct Train
+{
+    Line line;
+    int64_t arrivalTime;
+};
+
 struct StationInfo
 {
     char id[STATION_ID_LENGTH]{};
-    Line lines[MAX_TRAINS]{};
-    int64_t times[MAX_TRAINS]{};
+    std::vector<Train> trains;
 };
 
 // Network
@@ -51,7 +56,7 @@ const char* MTA_CERT = \
 const char* SERVER_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz";
 constexpr int SERVER_PORT = 443;
 constexpr int DEFAULT_TIMEOUT = 15000;
-constexpr int QUERY_INTERVAL_MS = 30000;
+constexpr int QUERY_INTERVAL_SEC = 30;
 constexpr int UPDATE_INTERVAL_MS = 1000;
 
 const char* SSID = "Kings";

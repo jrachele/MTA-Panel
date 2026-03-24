@@ -56,7 +56,7 @@ bool DecodeSTU(pb_istream_t* stream, const pb_field_t *, void** arg)
     // Skip already departed trains
     if (stu.arrival.time - time(nullptr) > 0)
     {
-      g_StationInfo.times[current_station_index] = stu.arrival.time;
+      g_StationInfo.trains[current_station_index].arrivalTime = stu.arrival.time;
       *didUpdateStop = true;
     }
   }
@@ -89,7 +89,7 @@ bool DecodeFeedEntity(pb_istream_t* stream, const pb_field_t *, void**)
   }
 
   // Otherwise, get the route associated with the trip object
-  g_StationInfo.lines[current_station_index] = Util::GetLineFromName(entity.trip_update.trip.route_id);
+  g_StationInfo.trains[current_station_index].line = Util::GetLineFromName(entity.trip_update.trip.route_id);
   current_station_index++;
 
   return true;
@@ -98,11 +98,13 @@ bool DecodeFeedEntity(pb_istream_t* stream, const pb_field_t *, void**)
 time_t lastUpdate = 0;
 
 void UpdateStationData() {
-  if (lastUpdate != 0 && time(nullptr) - lastUpdate < QUERY_INTERVAL_MS)
+  if (lastUpdate != 0 && time(nullptr) - lastUpdate < QUERY_INTERVAL_SEC)
   {
     return;
   }
 
+  g_StationInfo.trains.clear();
+  g_StationInfo.trains.reserve(MAX_TRAINS);
   current_station_index = 0;
   String response = QueryEndpoint(SERVER_URL);
 
@@ -112,6 +114,11 @@ void UpdateStationData() {
   feedMessage.entity.funcs.decode = &DecodeFeedEntity;
 
   pb_decode(&istream, &transit_realtime_FeedMessage_msg, &feedMessage);
+
+  std::sort(g_StationInfo.trains.begin(), g_StationInfo.trains.end(), [](const Train& a, const Train& b)
+  {
+    return a.arrivalTime < b.arrivalTime;
+  });
 
   lastUpdate = time(nullptr);
 }
@@ -137,22 +144,22 @@ void DrawStationData() {
   int16_t start = 12;
   Line l = Line::Invalid;
   for (int16_t i = 0; i < 3; i++) {
-    if (g_StationInfo.lines[i] == Line::Invalid)
+    const Train& train = g_StationInfo.trains[i];
+    if (train.line == Line::Invalid)
     {
       break;
     }
-    l = g_StationInfo.lines[i];
+    l = train.line;
     int y = start + (8 * i);
-    DrawLine(5, y, 3, g_StationInfo.lines[i]);
+    DrawLine(5, y, 3, l);
     g_Display->setCursor(10, y+2);
     time_t current = time(nullptr);
-    const long long difference_seconds = (g_StationInfo.times[i] - current);
+    const long long difference_seconds = (train.arrivalTime - current);
     char diff_fmt[50];
     int mins = (int) (difference_seconds / 60);
-    auto t = localtime((const time_t*)&g_StationInfo.times[i]);
+    auto t = localtime((const time_t*)&train.arrivalTime);
     sprintf(diff_fmt, "%d mins", mins);
     g_Display->printf("%s (%02d:%02d)", diff_fmt, t->tm_hour, t->tm_min);
-    // g_Display->printf("%s (%s)\n", g_StationInfo.minsTo[i].c_str(), g_StationInfo.times[i].c_str());
   }
 
   // Draw the station name and direction based on one of the lines above
