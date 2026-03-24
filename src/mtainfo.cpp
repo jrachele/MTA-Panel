@@ -1,10 +1,11 @@
-#include <pb_decode.h>
-#include "nyct-subway.pb.h"
+#include "nyct-subway.h"
 #include "mtainfo.h"
 #include <Fonts/Picopixel.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+
+#include "ReadBufferFixedSize.h"
 
 const char* SERVER_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz";
 constexpr int SERVER_PORT = 443;
@@ -307,13 +308,11 @@ void updateStationData() {
   Serial.printf("Station query response: %s\n", response.c_str());
 
   // Get good data from the protobuffer
+  EmbeddedProto::ReadBufferFixedSize<65536> buf;
+  memcpy(buf.get_data(), response.c_str(), response.length());
+  buf.set_bytes_written(response.length());
 
-  pb_istream_t istream = pb_istream_from_buffer(reinterpret_cast<const pb_byte_t*>(response.c_str()), static_cast<size_t>(response.length()));
-
-  transit_realtime_FeedMessage feedMessage = transit_realtime_FeedMessage_init_zero;
-  pb_decode(&istream, &transit_realtime_FeedMessage_msg, &feedMessage);
-  station_info->name.reserve(256);
-  sprintf(&station_info->name[0], "Time: %llu", feedMessage.header.timestamp);
+  transit_realtime::FeedMessage<>::deserialize(buf);
 
   //
   // JsonDocument doc;
