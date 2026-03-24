@@ -1,0 +1,2 @@
+transit_realtime.TripUpdate.StopTimeUpdate.stop_id		max_size:16 type:FT_STATIC
+transit_realtime.TripDescriptor.route_id		max_size:4 type:FT_STATIC

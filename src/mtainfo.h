@@ -1,87 +1,29 @@
-#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#pragma once
+#include <WiFiClientSecure.h>
 
-#define MAX_STOP_TIMES 3
+#include "ESP32-HUB75-MatrixPanel-I2S-DMA.h"
+#include "util.h"
 
-// Hard-code station data
+// Station
+const char* STATION_ID = "J30"; // Gates Ave J
+const char* STATION_NAME = "Gates Ave";
+Direction STATION_DIRECTION = Direction::S; // To Manhattan
 
+constexpr int STATION_ID_LENGTH = 16;
+constexpr int MAX_TRAINS = 3;
 
-enum class Direction
-{
-    N,
-    S,
-};
-
-enum class Line {
-    Invalid,
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    S,
-    L,
-    N,
-    R,
-    Q,
-    W,
-    B,
-    D,
-    F,
-    M,
-    A,
-    C,
-    E,
-    J,
-    Z,
-    G,
-};
-
+// TODO?: Embed station.txt data from MTA; not really relevant here since I'm not writing a whole API
 struct StationInfo
 {
-    const char *id;
-    String name;
-    Line lines[MAX_STOP_TIMES];
-    String times[MAX_STOP_TIMES];
-    String minsTo[MAX_STOP_TIMES];
-    Direction direction;
-    bool express;
+    char id[STATION_ID_LENGTH]{};
+    Line lines[MAX_TRAINS]{};
+    int64_t times[MAX_TRAINS]{};
 };
 
-#define COLOR_BROWN 0x8AE6
-#define COLOR_BLUE 0x0319
-#define COLOR_ORANGE 0xeb40
-#define COLOR_LIGHTGREEN 0x7ca6
-#define COLOR_DARKGREEN 0x04ca
-#define COLOR_GRAY 0x7c31
-#define COLOR_YELLOW 0xf5c5
-#define COLOR_RED 0xd106
-#define COLOR_PURPLE 0x99d4
-#define COLOR_BLACK 0x0000
-#define COLOR_WHITE 0xFFFF
-
-#define PANEL_RES_X 64 // Number of pixels wide of each INDIVIDUAL panel module.
-#define PANEL_RES_Y 32 // Number of pixels tall of each INDIVIDUAL panel module.
-#define PANEL_CHAIN 1  // Total number of panels chained one to another
-
-// Create display
-static HUB75_I2S_CFG::i2s_pins pins = {
-    25, // R1_PIN,
-    26, // G1_PIN,
-    27, // B1_PIN,
-    14, // R2_PIN,
-    12, // G2_PIN,
-    13, // B2_PIN,
-    23, // A_PIN,
-    22, // B_PIN,
-    5,  // C_PIN,
-    17, // D_PIN,
-    32, // E_PIN,
-    4,  // LAT_PIN,
-    15, // OE_PIN,
-    16, // CLK_PIN
-};
+// Network
+#define WIFI_WRITE(format, ...)                 \
+g_Wifi->printf(format, ##__VA_ARGS__); \
+Serial.printf(format, ##__VA_ARGS__);
 
 // This is the cert for https://api-endpoint.mta.info
 const char* MTA_CERT = \
@@ -105,3 +47,47 @@ const char* MTA_CERT = \
     "5MsI+yMRQ+hDKXJioaldXgjUkK642M4UwtBV8ob2xJNDd2ZhwLnoQdeXeGADbkpy\n" \
     "rqXRfboQnoZsG4q5WTP468SQvvG5\n" \
     "-----END CERTIFICATE-----\n";
+
+const char* SERVER_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz";
+constexpr int SERVER_PORT = 443;
+constexpr int DEFAULT_TIMEOUT = 15000;
+constexpr int QUERY_INTERVAL_MS = 30000;
+constexpr int UPDATE_INTERVAL_MS = 1000;
+
+const char* SSID = "Kings";
+const char* password = "thepactbindsthem";
+
+// Time
+const char* NTP_SERVER = "pool.ntp.org";
+const long GMT_OFFSET_HR = -5;
+const long GMT_OFFSET_SEC = GMT_OFFSET_HR * 3600;
+const int DAYLIGHT_OFFSET_SEC = 3600;
+
+// Panel
+#define PANEL_RES_X 64 // Number of pixels wide of each INDIVIDUAL panel module.
+#define PANEL_RES_Y 32 // Number of pixels tall of each INDIVIDUAL panel module.
+#define PANEL_CHAIN 1  // Total number of panels chained one to another
+
+// Create display
+static HUB75_I2S_CFG::i2s_pins pins = {
+    25, // R1_PIN,
+    26, // G1_PIN,
+    27, // B1_PIN,
+    14, // R2_PIN,
+    12, // G2_PIN,
+    13, // B2_PIN,
+    23, // A_PIN,
+    22, // B_PIN,
+    5,  // C_PIN,
+    17, // D_PIN,
+    32, // E_PIN,
+    4,  // LAT_PIN,
+    15, // OE_PIN,
+    16, // CLK_PIN
+};
+
+// Globals
+MatrixPanel_I2S_DMA* g_Display = nullptr;
+WiFiClientSecure* g_Wifi = nullptr;
+StationInfo g_StationInfo;
+
