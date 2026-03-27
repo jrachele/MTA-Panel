@@ -39,7 +39,6 @@ String QueryEndpoint(const char* url) {
   return {};
 }
 
-int current_station_index = 0;
 
 bool DecodeSTU(pb_istream_t* stream, const pb_field_t *, void** arg)
 {
@@ -49,15 +48,14 @@ bool DecodeSTU(pb_istream_t* stream, const pb_field_t *, void** arg)
     return false;
   }
 
-  bool* didUpdateStop = (bool*)*arg;
+  int64_t* arrivalTime = (int64_t*)*arg;
   if (strcmp(stu.stop_id, g_StationInfo.id) == 0)
   {
     Serial.printf("Stop ID: %s\nTimestamp: %llu\n", stu.stop_id, stu.arrival.time);
     // Skip already departed trains
     if (stu.arrival.time - time(nullptr) > 0)
     {
-      g_StationInfo.trains[current_station_index].arrivalTime = stu.arrival.time;
-      *didUpdateStop = true;
+      *arrivalTime = stu.arrival.time;
     }
   }
 
@@ -67,30 +65,33 @@ bool DecodeSTU(pb_istream_t* stream, const pb_field_t *, void** arg)
 bool DecodeFeedEntity(pb_istream_t* stream, const pb_field_t *, void**)
 {
   // Early out if we've already hit max lines
-  if (current_station_index >= MAX_TRAINS)
+  if (g_StationInfo.trains.size() >= MAX_TRAINS)
   {
     return true;
   }
 
   transit_realtime_FeedEntity entity = transit_realtime_FeedEntity_init_zero;
-  bool didUpdateStop = false;
+  int64_t arrivalTime = 0;
   entity.trip_update.stop_time_update.funcs.decode = &DecodeSTU;
-  entity.trip_update.stop_time_update.arg = &didUpdateStop;
+  entity.trip_update.stop_time_update.arg = &arrivalTime;
 
   if (!pb_decode(stream, transit_realtime_FeedEntity_fields, &entity))
   {
     return false;
   }
 
-  if (!entity.has_trip_update || !didUpdateStop)
+  if (!entity.has_trip_update || arrivalTime == 0)
   {
     // Early out if there's nothing relevant happening here
     return true;
   }
 
   // Otherwise, get the route associated with the trip object
-  g_StationInfo.trains[current_station_index].line = Util::GetLineFromName(entity.trip_update.trip.route_id);
-  current_station_index++;
+  Train train {
+    .line = Util::GetLineFromName(entity.trip_update.trip.route_id),
+    .arrivalTime = arrivalTime,
+  };
+  g_StationInfo.trains.push_back(train);
 
   return true;
 }
@@ -104,8 +105,6 @@ void UpdateStationData() {
   }
 
   g_StationInfo.trains.clear();
-  g_StationInfo.trains.reserve(MAX_TRAINS);
-  current_station_index = 0;
   String response = QueryEndpoint(SERVER_URL);
 
   pb_istream_t istream = pb_istream_from_buffer(reinterpret_cast<const pb_byte_t*>(response.c_str()), static_cast<size_t>(response.length()));
@@ -143,7 +142,7 @@ void DrawStationData() {
   g_Display->clearScreen();
   int16_t start = 12;
   Line l = Line::Invalid;
-  for (int16_t i = 0; i < 3; i++) {
+  for (int16_t i = 0; i < g_StationInfo.trains.size(); i++) {
     const Train& train = g_StationInfo.trains[i];
     if (train.line == Line::Invalid)
     {
